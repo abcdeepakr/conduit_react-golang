@@ -29,19 +29,6 @@ func ConnectDB() {
 
 	var connectionString = databaseConnectionString
 
-	// const dbName = "conduit_golang_backend"
-	// const collectionName = "users"
-
-	// clientOption := options.Client().ApplyURI(connectionString)
-	// client, err := mongo.Connect(context.TODO(), clientOption)
-
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	// Collection = client.Database(dbName).Collection(collectionName)
-	// fmt.Println("Collection instance is ready", &Collection)
-
 	Client, err = mongo.NewClient(options.Client().ApplyURI(connectionString))
 	if err != nil {
 		log.Fatal(err)
@@ -51,7 +38,7 @@ func ConnectDB() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// defer client.Disconnect(ctx)
+	// defer Client.Disconnect(ctx)
 
 	/*
 	   List databases

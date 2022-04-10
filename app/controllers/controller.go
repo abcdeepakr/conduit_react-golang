@@ -2,10 +2,8 @@ package controller
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 
 	database "github.com/deepakr-28/conduit_golang_backend/app/database"
@@ -29,7 +27,7 @@ func insertUser(user model.User) {
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
-	databaseName = os.Getenv("MONGODB_CONNECTION_STRING")
+	databaseName = os.Getenv("DATABASE_NAME")
 	res, err := database.Client.ListDatabaseNames(context.Background(), bson.M{})
 	// defer res.Body.Close()
 	if err != nil {
@@ -47,16 +45,16 @@ func insertUser(user model.User) {
 
 }
 
-func CreateUser(w http.ResponseWriter, r *http.Request) {
+// func CreateUser(w http.ResponseWriter, r *http.Request) {
 
-	w.Header().Set("Content-Type", "application/x-www-form-urlencode")
-	w.Header().Set("Allow-Control-Allow-Methods", "POST")
+// 	w.Header().Set("Content-Type", "application/x-www-form-urlencode")
+// 	w.Header().Set("Allow-Control-Allow-Methods", "POST")
 
-	var user model.User
+// 	var user model.User
 
-	_ = json.NewDecoder(r.Body).Decode(&user)
-	fmt.Println(user)
-	insertUser(user)
+// 	_ = json.NewDecoder(r.Body).Decode(&user)
+// 	// fmt.Println(user)
+// 	// insertUser(user)
 
-	json.NewEncoder(w).Encode(user)
-}
+// 	json.NewEncoder(w).Encode(user)
+// }
