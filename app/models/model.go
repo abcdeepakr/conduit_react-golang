@@ -9,6 +9,11 @@ type User struct {
 	Password string             `json:password`
 }
 
+type AuthenticatedResponse struct {
+	User      User   "json:user"
+	JsonToken string "json:jwt"
+}
+
 type Error struct {
 	Error   bool   `json:error`
 	Message string `json:message`

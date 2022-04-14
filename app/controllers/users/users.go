@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	database "github.com/deepakr-28/conduit_golang_backend/app/database"
 	model "github.com/deepakr-28/conduit_golang_backend/app/models"
@@ -57,9 +58,39 @@ func checkUsername(collection *mongo.Collection, user string) bool {
 	}
 }
 
-// func authenticateUser() {}
+func authenticateUser(collection *mongo.Collection, user model.User) bool {
 
-// func getUser() {}
+	var result model.User
+	fmt.Println("username : ", user)
+	err := collection.FindOne(context.TODO(), bson.M{"username": user.UserName}).Decode(&result)
+
+	if err != nil {
+		log.Fatal(err)
+		return false
+	} else {
+		if result.Password == user.Password {
+			return true
+		} else {
+			return false
+		}
+
+	}
+}
+
+func getUser(collection *mongo.Collection, token string) bool {
+	// this function will return a user based on the jwt token
+	// decode token here, get username, search username and return the user
+	decodedToken := "deepak"
+
+	if decodedToken == token {
+		// var result model.User
+		// fmt.Println("username : ", user)
+		// err := collection.FindOne(context.TODO(), bson.M{"username": user.UserName}).Decode(&result)
+		return true
+	} else {
+		return false
+	}
+}
 
 // func updateUser() {}
 
@@ -77,7 +108,6 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(r.Body).Decode(&user)
 
 	userNameExists := checkUsername(Collection, user.UserName)
-	fmt.Println(userNameExists)
 	if userNameExists {
 		error.Error = true
 		error.Message = "Username taken, please try another one"
@@ -85,7 +115,50 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	} else {
 		createUser(user)
 		json.NewEncoder(w).Encode(user)
-
 	}
+}
+func AuthenticateUser(w http.ResponseWriter, r *http.Request) {
+	Collection = database.Client.Database(databaseName).Collection(collectionName)
 
+	w.Header().Set("Content-Type", "application/x-www-form-urlencode")
+	w.Header().Set("Allow-Control-Allow-Methods", "POST")
+
+	var user model.User
+	var error model.Error
+
+	_ = json.NewDecoder(r.Body).Decode(&user)
+	response := authenticateUser(Collection, user)
+	if response {
+
+		responseData := model.AuthenticatedResponse{User: user, JsonToken: "something"}
+		json.NewEncoder(w).Encode(responseData)
+	} else {
+		error.Error = true
+		error.Message = "Password or Username Invalid, please check and re-enter"
+		json.NewEncoder(w).Encode(error)
+	}
+}
+func GetCurrentUser(w http.ResponseWriter, r *http.Request) {
+	Collection = database.Client.Database(databaseName).Collection(collectionName)
+
+	w.Header().Set("Content-Type", "application/x-www-form-urlencode")
+	w.Header().Set("Allow-Control-Allow-Methods", "POST")
+
+	var user model.User
+	var error model.Error
+
+	_ = json.NewDecoder(r.Body).Decode(&user)
+	reqToken := r.Header.Get("Authorization")
+	splitToken := strings.Split(reqToken, "Bearer ")
+	reqToken = splitToken[1]
+	response := getUser(Collection, reqToken)
+
+	if response {
+
+		json.NewEncoder(w).Encode("currnt user")
+	} else {
+		error.Error = true
+		error.Message = "user not logged in"
+		json.NewEncoder(w).Encode(error)
+	}
 }
