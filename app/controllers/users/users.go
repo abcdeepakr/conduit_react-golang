@@ -11,8 +11,10 @@ import (
 
 	database "github.com/deepakr-28/conduit_golang_backend/app/database"
 	model "github.com/deepakr-28/conduit_golang_backend/app/models"
+	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -77,7 +79,7 @@ func authenticateUser(collection *mongo.Collection, user model.User) bool {
 	}
 }
 
-func getUser(collection *mongo.Collection, token string) bool {
+func getCurrentUser(collection *mongo.Collection, token string) bool {
 	// this function will return a user based on the jwt token
 	// decode token here, get username, search username and return the user
 	decodedToken := "deepak"
@@ -92,7 +94,49 @@ func getUser(collection *mongo.Collection, token string) bool {
 	}
 }
 
-// func updateUser() {}
+func updateUser(collection *mongo.Collection, user model.User, token string) bool {
+
+	// this function will return a user based on the jwt token
+	// decode token here, get username, search username and return the user
+
+	var result model.User
+	decodedToken := "deepak"
+	if decodedToken == token {
+		filter := bson.M{"username": token} // get username from the token
+		updatedData := bson.M{
+			"$set": user,
+		}
+
+		upsert := true
+		after := options.After
+		opt := options.FindOneAndUpdateOptions{
+			ReturnDocument: &after,
+			Upsert:         &upsert,
+		}
+
+		err := collection.FindOneAndUpdate(context.TODO(), filter, updatedData, &opt).Decode(&result)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+		return true
+	} else {
+		return false
+	}
+}
+
+func getUser(collection *mongo.Collection, username string) model.User {
+
+	var result model.User
+	err := collection.FindOne(context.TODO(), bson.M{"username": username}).Decode(&result)
+
+	if err != nil {
+		result.UserName = "null"
+		return result
+	}
+	return result
+
+}
 
 // PARENT FUNCTIONS WHICH WILL BE USED IN ROUTER FILES ARE DEFINED BELOW.
 // FUNCTIONS ABOVE ARE HELPER METHODS WHICH ARE CALLED FROM THE FUNCTIONS BELOW.
@@ -151,7 +195,7 @@ func GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	reqToken := r.Header.Get("Authorization")
 	splitToken := strings.Split(reqToken, "Bearer ")
 	reqToken = splitToken[1]
-	response := getUser(Collection, reqToken)
+	response := getCurrentUser(Collection, reqToken)
 
 	if response {
 
@@ -159,6 +203,55 @@ func GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	} else {
 		error.Error = true
 		error.Message = "user not logged in"
+		json.NewEncoder(w).Encode(error)
+	}
+}
+func UpdateUser(w http.ResponseWriter, r *http.Request) {
+	Collection = database.Client.Database(databaseName).Collection(collectionName)
+
+	w.Header().Set("Content-Type", "application/x-www-form-urlencode")
+	w.Header().Set("Allow-Control-Allow-Methods", "POST")
+
+	var user model.User
+	var error model.Error
+
+	_ = json.NewDecoder(r.Body).Decode(&user)
+
+	reqToken := r.Header.Get("Authorization")
+	if reqToken == "" {
+		error.Error = true
+		error.Message = "Bearer Token not found"
+		json.NewEncoder(w).Encode(error)
+		return
+	}
+	splitToken := strings.Split(reqToken, "Bearer ")
+	reqToken = splitToken[1]
+	response := updateUser(Collection, user, reqToken)
+
+	if response {
+		json.NewEncoder(w).Encode(user)
+	} else {
+		error.Error = true
+		error.Message = "user not logged in"
+		json.NewEncoder(w).Encode(error)
+	}
+}
+func GetUser(w http.ResponseWriter, r *http.Request) {
+	Collection = database.Client.Database(databaseName).Collection(collectionName)
+
+	w.Header().Set("Content-Type", "application/x-www-form-urlencode")
+	w.Header().Set("Allow-Control-Allow-Methods", "POST")
+
+	var error model.Error
+
+	params := mux.Vars(r)
+	response := getUser(Collection, params["username"])
+
+	if response.UserName != "null" {
+		json.NewEncoder(w).Encode(response)
+	} else {
+		error.Error = true
+		error.Message = "User Not Found"
 		json.NewEncoder(w).Encode(error)
 	}
 }
