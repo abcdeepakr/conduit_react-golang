@@ -8,9 +8,11 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	database "github.com/deepakr-28/conduit_golang_backend/app/database"
 	model "github.com/deepakr-28/conduit_golang_backend/app/models"
+	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -25,12 +27,54 @@ const collectionName = "users"
 var databaseName string
 
 func init() {
+	// verifyToken()
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
 	databaseName = os.Getenv("DATABASE_NAME")
+}
 
+func createToken(username string) model.Response {
+
+	var hmacSampleSecret []byte
+	var tokenCreationResponse model.Response
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"username": username,
+		"nbf":      time.Date(2015, 10, 10, 12, 0, 0, 0, time.UTC).Unix(),
+	})
+	tokenString, err := token.SignedString(hmacSampleSecret)
+
+	if err != nil {
+		log.Fatal("err", err)
+		// tokenCreationResponse.Error = true
+		// tokenCreationResponse.Message = err.Error()
+		return tokenCreationResponse
+	}
+	tokenCreationResponse.Error = false
+	tokenCreationResponse.Message = tokenString
+	return tokenCreationResponse
+}
+
+func verifyToken(generatedToken string) {
+	var hmacSampleSecret []byte
+	tokenString := generatedToken
+
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		// Don't forget to validate the alg is what you expect:
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+		}
+
+		// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
+		return hmacSampleSecret, nil
+	})
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		fmt.Println(claims)
+	} else {
+		fmt.Println(err)
+	}
 }
 
 func createUser(user model.User) {
@@ -41,7 +85,6 @@ func createUser(user model.User) {
 		log.Fatal(err)
 	}
 	fmt.Println("Created a new user with id: ", inserted.InsertedID)
-
 }
 
 func checkUsername(collection *mongo.Collection, user string) bool {
@@ -71,7 +114,9 @@ func authenticateUser(collection *mongo.Collection, user model.User) bool {
 		return false
 	} else {
 		if result.Password == user.Password {
+
 			return true
+
 		} else {
 			return false
 		}
@@ -82,7 +127,7 @@ func authenticateUser(collection *mongo.Collection, user model.User) bool {
 func getCurrentUser(collection *mongo.Collection, token string) bool {
 	// this function will return a user based on the jwt token
 	// decode token here, get username, search username and return the user
-	decodedToken := "deepak"
+	decodedToken := verifyToken(token) // TODO RETURN A VALUE IN VERIFY TOKEN
 
 	if decodedToken == token {
 		// var result model.User
@@ -135,7 +180,6 @@ func getUser(collection *mongo.Collection, username string) model.User {
 		return result
 	}
 	return result
-
 }
 
 // PARENT FUNCTIONS WHICH WILL BE USED IN ROUTER FILES ARE DEFINED BELOW.
@@ -148,7 +192,7 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Allow-Control-Allow-Methods", "POST")
 
 	var user model.User
-	var error model.Error
+	var error model.Response
 	_ = json.NewDecoder(r.Body).Decode(&user)
 
 	userNameExists := checkUsername(Collection, user.UserName)
@@ -168,13 +212,13 @@ func AuthenticateUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Allow-Control-Allow-Methods", "POST")
 
 	var user model.User
-	var error model.Error
-
+	var error model.Response
+	var responseData model.AuthenticatedResponse
 	_ = json.NewDecoder(r.Body).Decode(&user)
 	response := authenticateUser(Collection, user)
 	if response {
-
-		responseData := model.AuthenticatedResponse{User: user, JsonToken: "something"}
+		newToken := createToken(user.UserName)
+		responseData = model.AuthenticatedResponse{User: user, JsonToken: newToken.Message}
 		json.NewEncoder(w).Encode(responseData)
 	} else {
 		error.Error = true
@@ -189,7 +233,7 @@ func GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Allow-Control-Allow-Methods", "POST")
 
 	var user model.User
-	var error model.Error
+	var error model.Response
 
 	_ = json.NewDecoder(r.Body).Decode(&user)
 	reqToken := r.Header.Get("Authorization")
@@ -213,7 +257,7 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Allow-Control-Allow-Methods", "POST")
 
 	var user model.User
-	var error model.Error
+	var error model.Response
 
 	_ = json.NewDecoder(r.Body).Decode(&user)
 
@@ -242,7 +286,7 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/x-www-form-urlencode")
 	w.Header().Set("Allow-Control-Allow-Methods", "POST")
 
-	var error model.Error
+	var error model.Response
 
 	params := mux.Vars(r)
 	response := getUser(Collection, params["username"])
