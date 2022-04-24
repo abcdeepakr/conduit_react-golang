@@ -8,11 +8,10 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
+	tokenPackage "github.com/deepakr-28/conduit_golang_backend/app/controllers/authToken"
 	database "github.com/deepakr-28/conduit_golang_backend/app/database"
 	model "github.com/deepakr-28/conduit_golang_backend/app/models"
-	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -33,60 +32,6 @@ func init() {
 		log.Fatal("Error loading .env file")
 	}
 	databaseName = os.Getenv("DATABASE_NAME")
-}
-
-func createToken(username string) model.Response {
-
-	var hmacSampleSecret []byte
-	var tokenCreationResponse model.Response
-
-	claims := model.Payload{
-		username,
-		jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(time.Minute * 120).Unix(),
-		},
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(hmacSampleSecret)
-
-	if err != nil {
-		log.Fatal("err", err)
-		// tokenCreationResponse.Error = true
-		// tokenCreationResponse.Message = err.Error()
-		return tokenCreationResponse
-	}
-	tokenCreationResponse.Error = false
-	tokenCreationResponse.Message = tokenString
-	return tokenCreationResponse
-}
-
-func verifyToken(generatedToken string) string {
-	// var hmacSampleSecret []byte
-	tokenString := generatedToken
-	fmt.Print(tokenString)
-	type Payload struct {
-		Username string `json:"username"`
-		jwt.StandardClaims
-	}
-
-	// https://pkg.go.dev/github.com/golang-jwt/jwt#NewWithClaims
-	// Override time value for tests.  Restore default value after.
-
-	token, err := jwt.ParseWithClaims(tokenString, &Payload{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte(""), nil
-	})
-	if err != nil {
-		log.Fatal("ERROR", err)
-		return ""
-	}
-
-	claims, ok := token.Claims.(*Payload)
-	if ok && token.Valid {
-		fmt.Println(claims)
-	}
-
-	return claims.Username
 }
 
 func createUser(user model.User) {
@@ -139,7 +84,8 @@ func authenticateUser(collection *mongo.Collection, user model.User) bool {
 func getCurrentUser(collection *mongo.Collection, token string) model.User {
 
 	var user model.User
-	username := verifyToken(token) // TODO RETURN A VALUE IN VERIFY TOKEN
+	// username :=  verifyToken(token) // TODO RETURN A VALUE IN VERIFY TOKEN
+	username := tokenPackage.VerifyToken(token) // TODO RETURN A VALUE IN VERIFY TOKEN
 
 	fmt.Println("DECODED VALUE ", username)
 
@@ -157,7 +103,7 @@ func updateUser(collection *mongo.Collection, user model.User, token string) boo
 	// decode token here, get username, search username and return the user
 
 	var result model.User
-	username := verifyToken(token)
+	username := tokenPackage.VerifyToken(token)
 	if username != "" {
 		filter := bson.M{"username": username} // get username from the token
 		updatedData := bson.M{
@@ -197,7 +143,7 @@ func getUser(collection *mongo.Collection, username string) model.User {
 func followUser(collection *mongo.Collection, username string, token string) model.User {
 
 	var result model.User
-	currentUser := verifyToken(token)
+	currentUser := tokenPackage.VerifyToken(token)
 
 	if currentUser == "" {
 		log.Fatal("TOKEN ERROR")
@@ -218,7 +164,7 @@ func followUser(collection *mongo.Collection, username string, token string) mod
 func unfollowUser(collection *mongo.Collection, username string, token string) model.User {
 
 	var result model.User
-	currentUser := verifyToken(token)
+	currentUser := tokenPackage.VerifyToken(token)
 
 	if currentUser == "" {
 		log.Fatal("TOKEN ERROR")
@@ -274,7 +220,8 @@ func AuthenticateUser(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(r.Body).Decode(&user)
 	response := authenticateUser(Collection, user)
 	if response {
-		newToken := createToken(user.UserName)
+		// newToken := createToken(user.UserName)
+		newToken := tokenPackage.CreateToken(user.UserName)
 		responseData = model.AuthenticatedResponse{User: user, JsonToken: newToken.Message}
 		json.NewEncoder(w).Encode(responseData)
 	} else {
