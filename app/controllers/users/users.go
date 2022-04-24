@@ -27,7 +27,7 @@ const collectionName = "users"
 var databaseName string
 
 func init() {
-	// verifyToken()
+
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
@@ -39,10 +39,15 @@ func createToken(username string) model.Response {
 
 	var hmacSampleSecret []byte
 	var tokenCreationResponse model.Response
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"username": username,
-		"nbf":      time.Date(2015, 10, 10, 12, 0, 0, 0, time.UTC).Unix(),
-	})
+
+	claims := model.Payload{
+		username,
+		jwt.StandardClaims{
+			ExpiresAt: time.Now().Add(time.Minute * 120).Unix(),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString(hmacSampleSecret)
 
 	if err != nil {
@@ -56,25 +61,32 @@ func createToken(username string) model.Response {
 	return tokenCreationResponse
 }
 
-func verifyToken(generatedToken string) {
-	var hmacSampleSecret []byte
+func verifyToken(generatedToken string) string {
+	// var hmacSampleSecret []byte
 	tokenString := generatedToken
-
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		// Don't forget to validate the alg is what you expect:
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
-		}
-
-		// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
-		return hmacSampleSecret, nil
-	})
-
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		fmt.Println(claims)
-	} else {
-		fmt.Println(err)
+	fmt.Print(tokenString)
+	type Payload struct {
+		Username string `json:"username"`
+		jwt.StandardClaims
 	}
+
+	// https://pkg.go.dev/github.com/golang-jwt/jwt#NewWithClaims
+	// Override time value for tests.  Restore default value after.
+
+	token, err := jwt.ParseWithClaims(tokenString, &Payload{}, func(token *jwt.Token) (interface{}, error) {
+		return []byte(""), nil
+	})
+	if err != nil {
+		log.Fatal("ERROR", err)
+		return ""
+	}
+
+	claims, ok := token.Claims.(*Payload)
+	if ok && token.Valid {
+		fmt.Println(claims)
+	}
+
+	return claims.Username
 }
 
 func createUser(user model.User) {
@@ -124,19 +136,19 @@ func authenticateUser(collection *mongo.Collection, user model.User) bool {
 	}
 }
 
-func getCurrentUser(collection *mongo.Collection, token string) bool {
-	// this function will return a user based on the jwt token
-	// decode token here, get username, search username and return the user
-	decodedToken := verifyToken(token) // TODO RETURN A VALUE IN VERIFY TOKEN
+func getCurrentUser(collection *mongo.Collection, token string) model.User {
 
-	if decodedToken == token {
-		// var result model.User
-		// fmt.Println("username : ", user)
-		// err := collection.FindOne(context.TODO(), bson.M{"username": user.UserName}).Decode(&result)
-		return true
-	} else {
-		return false
+	var user model.User
+	username := verifyToken(token) // TODO RETURN A VALUE IN VERIFY TOKEN
+
+	fmt.Println("DECODED VALUE ", username)
+
+	err := collection.FindOne(context.TODO(), bson.M{"username": username}).Decode(&user)
+	fmt.Print(user)
+	if err != nil {
+		log.Fatal(err)
 	}
+	return user
 }
 
 func updateUser(collection *mongo.Collection, user model.User, token string) bool {
@@ -145,9 +157,9 @@ func updateUser(collection *mongo.Collection, user model.User, token string) boo
 	// decode token here, get username, search username and return the user
 
 	var result model.User
-	decodedToken := "deepak"
-	if decodedToken == token {
-		filter := bson.M{"username": token} // get username from the token
+	username := verifyToken(token)
+	if username != "" {
+		filter := bson.M{"username": username} // get username from the token
 		updatedData := bson.M{
 			"$set": user,
 		}
@@ -180,6 +192,51 @@ func getUser(collection *mongo.Collection, username string) model.User {
 		return result
 	}
 	return result
+}
+
+func followUser(collection *mongo.Collection, username string, token string) model.User {
+
+	var result model.User
+	currentUser := verifyToken(token)
+
+	if currentUser == "" {
+		log.Fatal("TOKEN ERROR")
+	}
+
+	err := collection.FindOne(context.TODO(), bson.M{"username": currentUser}).Decode(&result)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	result.Following = append(result.Following, username)
+
+	return result
+
+}
+
+func unfollowUser(collection *mongo.Collection, username string, token string) model.User {
+
+	var result model.User
+	currentUser := verifyToken(token)
+
+	if currentUser == "" {
+		log.Fatal("TOKEN ERROR")
+	}
+
+	err := collection.FindOne(context.TODO(), bson.M{"username": currentUser}).Decode(&result)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	for index, currentUsername := range result.Followers {
+		if currentUsername == username {
+			result.Followers = append(result.Followers[:index], result.Followers[index+1:]...)
+		}
+	}
+
+	return result
+
 }
 
 // PARENT FUNCTIONS WHICH WILL BE USED IN ROUTER FILES ARE DEFINED BELOW.
@@ -241,9 +298,8 @@ func GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	reqToken = splitToken[1]
 	response := getCurrentUser(Collection, reqToken)
 
-	if response {
-
-		json.NewEncoder(w).Encode("currnt user")
+	if response.UserName != "" {
+		json.NewEncoder(w).Encode(user)
 	} else {
 		error.Error = true
 		error.Message = "user not logged in"
@@ -291,6 +347,64 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	response := getUser(Collection, params["username"])
 
+	if response.UserName != "null" {
+		json.NewEncoder(w).Encode(response)
+	} else {
+		error.Error = true
+		error.Message = "User Not Found"
+		json.NewEncoder(w).Encode(error)
+	}
+}
+
+func FollowUser(w http.ResponseWriter, r *http.Request) {
+	Collection = database.Client.Database(databaseName).Collection(collectionName)
+
+	w.Header().Set("Content-Type", "application/x-www-form-urlencode")
+	w.Header().Set("Allow-Control-Allow-Methods", "POST")
+
+	var error model.Response
+
+	params := mux.Vars(r)
+
+	reqToken := r.Header.Get("Authorization")
+	if reqToken == "" {
+		error.Error = true
+		error.Message = "Bearer Token not found"
+		json.NewEncoder(w).Encode(error)
+		return
+	}
+	splitToken := strings.Split(reqToken, "Bearer ")
+	reqToken = splitToken[1]
+	response := followUser(Collection, params["username"], reqToken)
+	if response.UserName != "null" {
+		json.NewEncoder(w).Encode(response)
+	} else {
+		error.Error = true
+		error.Message = "User Not Found"
+		json.NewEncoder(w).Encode(error)
+	}
+}
+
+func UnfollowUser(w http.ResponseWriter, r *http.Request) {
+	Collection = database.Client.Database(databaseName).Collection(collectionName)
+
+	w.Header().Set("Content-Type", "application/x-www-form-urlencode")
+	w.Header().Set("Allow-Control-Allow-Methods", "POST")
+
+	var error model.Response
+
+	params := mux.Vars(r)
+
+	reqToken := r.Header.Get("Authorization")
+	if reqToken == "" {
+		error.Error = true
+		error.Message = "Bearer Token not found"
+		json.NewEncoder(w).Encode(error)
+		return
+	}
+	splitToken := strings.Split(reqToken, "Bearer ")
+	reqToken = splitToken[1]
+	response := unfollowUser(Collection, params["username"], reqToken)
 	if response.UserName != "null" {
 		json.NewEncoder(w).Encode(response)
 	} else {
