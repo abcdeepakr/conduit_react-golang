@@ -87,10 +87,10 @@ func getCurrentUser(collection *mongo.Collection, token string) model.User {
 	// username :=  verifyToken(token) // TODO RETURN A VALUE IN VERIFY TOKEN
 	username := tokenPackage.VerifyToken(token) // TODO RETURN A VALUE IN VERIFY TOKEN
 
-	fmt.Println("DECODED VALUE ", username)
+	// fmt.Println("DECODED VALUE ", username)
 
 	err := collection.FindOne(context.TODO(), bson.M{"username": username}).Decode(&user)
-	fmt.Print(user)
+	// fmt.Print(user)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -139,31 +139,67 @@ func getUser(collection *mongo.Collection, username string) model.User {
 	}
 	return result
 }
-
+func AppendIfMissing(slice []string, i string) []string {
+	for _, ele := range slice {
+		if ele == i {
+			return slice
+		}
+	}
+	return append(slice, i)
+}
 func followUser(collection *mongo.Collection, username string, token string) model.User {
 
-	var result model.User
+	var currentUsersFollowing model.User
+	var followedUser model.User
 	currentUser := tokenPackage.VerifyToken(token)
 
 	if currentUser == "" {
 		log.Fatal("TOKEN ERROR")
 	}
 
-	err := collection.FindOne(context.TODO(), bson.M{"username": currentUser}).Decode(&result)
+	err := collection.FindOne(context.TODO(), bson.M{"username": currentUser}).Decode(&currentUsersFollowing)
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	result.Following = append(result.Following, username)
+	currentUsersFollowing.Following = append(currentUsersFollowing.Following, username)
+	// * UPDATING THE FOLLOWERS ARRAY FOR THE FOLLOWED USER
 
-	return result
+	error := collection.FindOne(context.TODO(), bson.M{"username": username}).Decode(&followedUser)
+
+	if error != nil {
+		log.Fatal(err)
+	}
+
+	followedUser.Followers = AppendIfMissing(followedUser.Followers, currentUser) // append(followedUser.Followers, currentUser)
+	fmt.Println(followedUser)
+
+	filter := bson.M{"username": username} // get username from the token
+	updatedData := bson.M{
+		"$set": followedUser,
+	}
+
+	upsert := true
+	after := options.After
+	opt := options.FindOneAndUpdateOptions{
+		ReturnDocument: &after,
+		Upsert:         &upsert,
+	}
+	var result model.User
+	updateUserError := collection.FindOneAndUpdate(context.TODO(), filter, updatedData, &opt).Decode(&result)
+
+	if updateUserError != nil {
+		log.Fatal(err)
+	}
+	return currentUsersFollowing
 
 }
 
 func unfollowUser(collection *mongo.Collection, username string, token string) model.User {
 
 	var result model.User
+	var unfollowedUser model.User
 	currentUser := tokenPackage.VerifyToken(token)
 
 	if currentUser == "" {
@@ -175,10 +211,41 @@ func unfollowUser(collection *mongo.Collection, username string, token string) m
 	if err != nil {
 		log.Fatal(err)
 	}
-	for index, currentUsername := range result.Followers {
+	for index, currentUsername := range result.Following {
 		if currentUsername == username {
-			result.Followers = append(result.Followers[:index], result.Followers[index+1:]...)
+			result.Following = append(result.Following[:index], result.Following[index+1:]...)
 		}
+	}
+
+	// * REMOVE FROM THE UNFOLLWED USERS FOLLOWERS ARRAY
+	error := collection.FindOne(context.TODO(), bson.M{"username": username}).Decode(&unfollowedUser)
+
+	if error != nil {
+		log.Fatal(err)
+	}
+
+	for index, currentUsername := range unfollowedUser.Followers {
+		if currentUsername == currentUser {
+			unfollowedUser.Followers = append(unfollowedUser.Followers[:index], unfollowedUser.Followers[index+1:]...)
+		}
+	}
+	fmt.Printf("unfollowed %v	", unfollowedUser)
+	filter := bson.M{"username": username} // get username from the token
+	updatedData := bson.M{
+		"$set": unfollowedUser,
+	}
+
+	upsert := true
+	after := options.After
+	opt := options.FindOneAndUpdateOptions{
+		ReturnDocument: &after,
+		Upsert:         &upsert,
+	}
+	var updatedUnfollowedUser model.User
+	updateUserError := collection.FindOneAndUpdate(context.TODO(), filter, updatedData, &opt).Decode(&updatedUnfollowedUser)
+
+	if updateUserError != nil {
+		log.Fatal(err)
 	}
 
 	return result
