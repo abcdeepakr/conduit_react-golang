@@ -41,7 +41,7 @@ func createUser(user model.User) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("Created a new user with id: ", inserted.InsertedID)
+	fmt.Println("Created a new user with id : ", inserted.InsertedID)
 }
 
 func checkUsername(collection *mongo.Collection, user string) bool {
