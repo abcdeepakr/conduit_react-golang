@@ -1,6 +1,6 @@
 module github.com/deepakr-28/conduit_golang_backend
 
-go 1.17
+go 1.19
 
 require (
 	github.com/golang-jwt/jwt v3.2.2+incompatible
