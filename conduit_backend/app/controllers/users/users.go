@@ -255,8 +255,14 @@ func unfollowUser(collection *mongo.Collection, username string, token string) m
 // PARENT FUNCTIONS WHICH WILL BE USED IN ROUTER FILES ARE DEFINED BELOW.
 // FUNCTIONS ABOVE ARE HELPER METHODS WHICH ARE CALLED FROM THE FUNCTIONS BELOW.
 
+func Homepage(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/text")
+	w.Write([]byte("Success"))
+	return
+}
+
 func CreateUser(w http.ResponseWriter, r *http.Request) {
-	Collection = database.Client.Database(databaseName).Collection(collectionName)
 
 	w.Header().Set("Content-Type", "application/x-www-form-urlencode")
 	w.Header().Set("Allow-Control-Allow-Methods", "POST")
