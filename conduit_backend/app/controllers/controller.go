@@ -44,17 +44,3 @@ func insertUser(user model.User) {
 	fmt.Println("Inserted 1 user in db with id: ", inserted.InsertedID)
 
 }
-
-// func CreateUser(w http.ResponseWriter, r *http.Request) {
-
-// 	w.Header().Set("Content-Type", "application/x-www-form-urlencode")
-// 	w.Header().Set("Allow-Control-Allow-Methods", "POST")
-
-// 	var user model.User
-
-// 	_ = json.NewDecoder(r.Body).Decode(&user)
-// 	// fmt.Println(user)
-// 	// insertUser(user)
-
-// 	json.NewEncoder(w).Encode(user)
-// }
