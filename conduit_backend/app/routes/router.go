@@ -10,8 +10,7 @@ import (
 func Router() *mux.Router {
 
 	router := mux.NewRouter()
-
-	router.HandleFunc("/api/home", userController.Homepage).Methods("GET")
+	router.HandleFunc("/", userController.Homepage).Methods("GET")
 	// USER ROUTES
 	router.HandleFunc("/api/users", userController.CreateUser).Methods("POST")                          // creates user
 	router.HandleFunc("/api/users/login", userController.AuthenticateUser).Methods("POST")              // login user
