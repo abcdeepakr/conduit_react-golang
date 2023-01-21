@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	var PORT = os.Getenv("PORT")
+	var PORT = os.Getenv("HTTP_PLATFORM_PORT")
 	database.ConnectDB()
 	fmt.Println("MONGODB API")
 	r := router.Router()
