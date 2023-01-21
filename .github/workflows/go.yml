@@ -27,5 +27,5 @@ jobs:
         # Name of the Azure Web App
         app-name: conduit-backend
         # Applies to Web App only: Path to package or folder. *.zip, *.war, *.jar or a folder to deploy
-        package:../conduit_backend/build/
+        package: ../conduit_backend/build/
         publish-profile: ${{ secrets.azureWebAppPublishProfile }}
