@@ -19,7 +19,7 @@ jobs:
         go-version: 1.19
 
     - name: Build
-      run: cd ../../conduit_backend && go build -o build/go-app.exe -v
+      run: cd conduit_backend && go build -o build/go-app.exe -v
       
     - name: Deploy to Azure
       uses: Azure/webapps-deploy@v2
