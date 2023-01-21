@@ -9,7 +9,7 @@ on:
 jobs:
 
   build:
-    runs-on: windows-latest
+    runs-on: Linux
     steps:
     - uses: actions/checkout@v3
 
@@ -25,7 +25,7 @@ jobs:
       uses: Azure/webapps-deploy@v2
       with:
         # Name of the Azure Web App
-        app-name: conduit-backend
+        app-name: conduitapi
         # Applies to Web App only: Path to package or folder. *.zip, *.war, *.jar or a folder to deploy
         package: conduit_backend/build/
         publish-profile: ${{ secrets.azureWebAppPublishProfile }}
