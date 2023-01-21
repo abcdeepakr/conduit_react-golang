@@ -19,7 +19,7 @@ jobs:
         go-version: 1.19
 
     - name: Build
-      run: cd conduit_backend && go build -o build/go-app.exe -v
+      run: cd ../conduit_backend && go build -o build/go-app.exe -v
       
     - name: Deploy to Azure
       uses: Azure/webapps-deploy@v2
@@ -27,5 +27,5 @@ jobs:
         # Name of the Azure Web App
         app-name: conduit-backend
         # Applies to Web App only: Path to package or folder. *.zip, *.war, *.jar or a folder to deploy
-        package: /conduit_backend/build/
+        package:../conduit_backend/build/
         publish-profile: ${{ secrets.azureWebAppPublishProfile }}
