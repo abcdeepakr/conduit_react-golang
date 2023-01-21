@@ -5,3 +5,8 @@
 [build.environment]
   GO_IMPORT_PATH = "github.com/deepakr-28/conduit_golang_backend"
   GO111MODULE = "on"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/gateway/:splat"
+  status = 200
