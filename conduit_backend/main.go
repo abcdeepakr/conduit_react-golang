@@ -11,12 +11,10 @@ import (
 )
 
 func main() {
-	var databaseConnectionString = os.Getenv("PORT")
+	var PORT = os.Getenv("PORT")
 	database.ConnectDB()
 	fmt.Println("MONGODB API")
 	r := router.Router()
-	fmt.Println("SERVER STARTING...")
-	fmt.Println("SERVER STARTED AT PORT " + databaseConnectionString)
-	log.Fatal(http.ListenAndServe(":"+databaseConnectionString, r))
-	fmt.Println("SERVER STARTED AT PORT " + databaseConnectionString)
+	fmt.Println("SERVER STARTED AT PORT " + PORT)
+	log.Fatal(http.ListenAndServe(":"+PORT, r))
 }
